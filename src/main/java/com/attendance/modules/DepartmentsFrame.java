@@ -8,8 +8,6 @@ import javax.swing.*;
 import javax.swing.border.*;
 import javax.swing.table.*;
 import java.awt.*;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
 import java.sql.*;
 
 public class DepartmentsFrame extends JFrame {
@@ -18,12 +16,8 @@ public class DepartmentsFrame extends JFrame {
     private JTable table;
     private DefaultTableModel tableModel;
     private int selectedId = -1;
-    private Runnable onClose;
 
-    public DepartmentsFrame() { this(null); }
-
-    public DepartmentsFrame(Runnable onClose) {
-        this.onClose = onClose;
+    public DepartmentsFrame() {
         setTitle("AttendX — Departments");
         setSize(960, 620);
         setLocationRelativeTo(null);
@@ -31,9 +25,6 @@ public class DepartmentsFrame extends JFrame {
         buildUI();
         loadColleges();
         loadTable("");
-        addWindowListener(new WindowAdapter() {
-            public void windowClosed(WindowEvent e) { if (onClose != null) onClose.run(); }
-        });
     }
 
     private void buildUI() {

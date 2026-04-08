@@ -15,7 +15,6 @@ public class CoursesFrame extends JFrame {
     private JTable table;
     private DefaultTableModel tableModel;
     private int selectedId = -1;
-    private Runnable onClose;
 
     public CoursesFrame() {
         setTitle("AttendX — Courses");

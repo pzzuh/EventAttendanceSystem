@@ -1,4 +1,4 @@
-package com.attendance;
+package com.attendance.util;
 
 import com.itextpdf.kernel.colors.ColorConstants;
 import com.itextpdf.kernel.geom.PageSize;
@@ -142,7 +142,7 @@ public class AttendancePdfExporter {
                     }
 
                     // Alternate row shading
-                    if (row % 2 == 0 && dataCell.getBackgroundColor() == null) {
+                    if (row % 2 == 0) {
                         dataCell.setBackgroundColor(new com.itextpdf.kernel.colors.DeviceRgb(
                             245, 245, 245));
                     }

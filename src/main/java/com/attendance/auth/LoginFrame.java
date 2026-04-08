@@ -1,12 +1,12 @@
 package com.attendance.auth;
 
+
 import com.attendance.db.DatabaseConnection;
 import com.attendance.util.PasswordUtil;
 import com.attendance.util.Session;
 import com.attendance.util.UITheme;
 
 import javax.swing.*;
-
 import java.awt.*;
 import java.sql.*;
 

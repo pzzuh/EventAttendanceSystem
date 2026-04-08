@@ -1,7 +1,10 @@
-package com.attendance;
+package com.attendance.db;
 
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 
 /**
@@ -75,6 +78,50 @@ public class DatabaseConnection {
             } finally {
                 connection = null;
             }
+        }
+    }
+
+    /**
+     * Initializes the database schema and seeds default admin user if needed.
+     * Call this once at application startup.
+     */
+    public static void initializeDatabase() {
+        try {
+            Connection conn = getConnection();
+            // Check if users table exists
+            DatabaseMetaData meta = conn.getMetaData();
+            ResultSet tables = meta.getTables(null, null, "users", new String[]{"TABLE"});
+            
+            if (!tables.next()) {
+                System.out.println("[DB] Database schema not found. Please import event_attendance_system.sql");
+                return;
+            }
+            
+            // Check if default admin exists
+            String checkAdminSQL = "SELECT COUNT(*) as cnt FROM users WHERE username = 'admin'";
+            PreparedStatement checkStmt = conn.prepareStatement(checkAdminSQL);
+            ResultSet rs = checkStmt.executeQuery();
+            
+            if (rs.next() && rs.getInt("cnt") == 0) {
+                // Create default admin user
+                String insertAdminSQL = "INSERT INTO users (first_name, last_name, username, password, role, status) VALUES (?, ?, ?, ?, ?, ?)";
+                PreparedStatement insertStmt = conn.prepareStatement(insertAdminSQL);
+                insertStmt.setString(1, "System");
+                insertStmt.setString(2, "Admin");
+                insertStmt.setString(3, "admin");
+                insertStmt.setString(4, "admin123"); // Should be hashed in production
+                insertStmt.setString(5, "Super Admin");
+                insertStmt.setString(6, "Active");
+                insertStmt.executeUpdate();
+                System.out.println("[DB] Default admin user created");
+                insertStmt.close();
+            }
+            rs.close();
+            checkStmt.close();
+            
+            System.out.println("[DB] Database initialized successfully");
+        } catch (SQLException e) {
+            System.err.println("[DB] Error initializing database: " + e.getMessage());
         }
     }
 

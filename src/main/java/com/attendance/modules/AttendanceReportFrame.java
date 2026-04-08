@@ -7,6 +7,20 @@ import javax.swing.*;
 import javax.swing.table.*;
 import java.awt.*;
 import java.sql.*;
+import java.io.*;
+import com.itextpdf.kernel.pdf.PdfWriter;
+import com.itextpdf.kernel.pdf.PdfDocument;
+import com.itextpdf.layout.Document;
+import com.itextpdf.layout.element.Table;
+import com.itextpdf.layout.element.Cell;
+import com.itextpdf.layout.element.Paragraph;
+import com.itextpdf.layout.properties.TextAlignment;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.FillPatternType;
+import org.apache.poi.ss.usermodel.IndexedColors;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 public class AttendanceReportFrame extends JFrame {
     private JComboBox<String> cmbCollege, cmbDept, cmbCourse, cmbEvent, cmbStudent;
@@ -66,11 +80,15 @@ public class AttendanceReportFrame extends JFrame {
         btnRow.setOpaque(false);
         txtSearch = UITheme.styledField(); txtSearch.setPreferredSize(new Dimension(200, 32));
         JButton btnFilter = UITheme.primaryButton("Apply Filter");
-        JButton btnExport = UITheme.successButton("Export CSV");
+        JButton btnExportCsv = UITheme.successButton("📊 CSV");
+        JButton btnExportPdf = UITheme.successButton("📄 PDF");
+        JButton btnExportExcel = UITheme.successButton("📈 Excel");
         btnFilter.addActionListener(e -> loadTable());
-        btnExport.addActionListener(e -> exportCSV());
+        btnExportCsv.addActionListener(e -> exportCSV());
+        btnExportPdf.addActionListener(e -> exportPDF());
+        btnExportExcel.addActionListener(e -> exportExcel());
         btnRow.add(new JLabel("Search Student:")); btnRow.add(txtSearch);
-        btnRow.add(btnFilter); btnRow.add(btnExport);
+        btnRow.add(btnFilter); btnRow.add(btnExportCsv); btnRow.add(btnExportPdf); btnRow.add(btnExportExcel);
         filterPanel.add(btnRow, g);
 
         cmbCollege.addActionListener(e -> filterDepts());
@@ -145,16 +163,13 @@ public class AttendanceReportFrame extends JFrame {
     private void loadTable() {
         tableModel.setRowCount(0);
         StringBuilder sql = new StringBuilder(
-            "SELECT s.student_id_number, s.first_name||' '||s.last_name, d.department_name, co.course_name, " +
-            "e.event_name, e.start_date, " +
-            "MAX(CASE WHEN a.scan_type='TIME_IN' THEN a.scan_time END) as time_in, " +
-            "MAX(CASE WHEN a.scan_type='TIME_OUT' THEN a.scan_time END) as time_out, " +
-            "MAX(a.remarks) as remarks, e.penalty_amount " +
+            "SELECT s.student_id_number, CONCAT(s.first_name,' ',s.last_name) as name, d.department_name, c.course_name, " +
+            "e.event_name, a.scan_date, a.time_in, a.time_out, a.remarks, e.penalty_amount " +
             "FROM attendance a " +
             "JOIN students s ON s.id=a.student_id " +
             "JOIN events e ON e.id=a.event_id " +
-            "LEFT JOIN departments d ON d.id=s.department_id " +
-            "LEFT JOIN courses co ON co.id=s.course_id " +
+            "JOIN departments d ON d.id=s.department_id " +
+            "JOIN courses c ON c.id=s.course_id " +
             "WHERE 1=1");
 
         String si = (String) cmbCollege.getSelectedItem();
@@ -170,22 +185,32 @@ public class AttendanceReportFrame extends JFrame {
         String search = txtSearch.getText().trim();
         if (!search.isEmpty()) sql.append(" AND (s.first_name LIKE '%").append(search).append("%' OR s.last_name LIKE '%").append(search).append("%')");
 
-        sql.append(" GROUP BY a.event_id, a.student_id ORDER BY e.start_date DESC, s.last_name");
+        sql.append(" ORDER BY a.scan_date DESC, s.last_name ASC");
 
-        int present = 0, late = 0; double penalty = 0;
+        int present = 0, late = 0, absent = 0; double penalty = 0;
         try (Connection c = DatabaseConnection.getConnection(); ResultSet rs = c.createStatement().executeQuery(sql.toString())) {
             while (rs.next()) {
                 String rem = rs.getString("remarks");
-                tableModel.addRow(new Object[]{rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4),
-                    rs.getString(5), rs.getString(6), rs.getString(7), rs.getString(8), rem});
+                tableModel.addRow(new Object[]{
+                    rs.getString("student_id_number"),
+                    rs.getString("name"),
+                    rs.getString("department_name"),
+                    rs.getString("course_name"),
+                    rs.getString("event_name"),
+                    rs.getDate("scan_date"),
+                    rs.getTimestamp("time_in"),
+                    rs.getTimestamp("time_out"),
+                    rem
+                });
                 if ("Late".equals(rem)) { late++; penalty += rs.getDouble("penalty_amount"); }
-                else present++;
+                else if ("Present".equals(rem)) present++;
+                else if ("Absent".equals(rem)) absent++;
             }
         } catch (SQLException e) { e.printStackTrace(); }
 
         lblPresent.setText(String.valueOf(present));
         lblLate.setText(String.valueOf(late));
-        lblAbsent.setText("N/A");
+        lblAbsent.setText(String.valueOf(absent));
         lblPenalty.setText(String.format("₱%.2f", penalty));
     }
 
@@ -207,7 +232,127 @@ public class AttendanceReportFrame extends JFrame {
                 }
                 pw.println();
             }
-            JOptionPane.showMessageDialog(this, "Exported successfully!");
+            JOptionPane.showMessageDialog(this, "Exported to CSV successfully!");
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Export failed: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void exportPDF() {
+        javax.swing.JFileChooser fc = new javax.swing.JFileChooser();
+        fc.setSelectedFile(new java.io.File("attendance_report.pdf"));
+        if (fc.showSaveDialog(this) != javax.swing.JFileChooser.APPROVE_OPTION) return;
+        try {
+            PdfWriter writer = new PdfWriter(fc.getSelectedFile());
+            PdfDocument pdfDoc = new PdfDocument(writer);
+            Document document = new Document(pdfDoc);
+            
+            // Title
+            Paragraph title = new Paragraph("Attendance Report").setTextAlignment(TextAlignment.CENTER).setFontSize(18).setBold();
+            document.add(title);
+            document.add(new Paragraph("\n"));
+            
+            // Stats summary
+            Paragraph stats = new Paragraph(
+                "Present: " + lblPresent.getText() + " | Late: " + lblLate.getText() + " | " +
+                "Absent: " + lblAbsent.getText() + " | Penalty: " + lblPenalty.getText()
+            ).setTextAlignment(TextAlignment.CENTER).setFontSize(10);
+            document.add(stats);
+            document.add(new Paragraph("\n"));
+            
+            // Table
+            Table pdfTable = new Table(tableModel.getColumnCount());
+            for (int col = 0; col < tableModel.getColumnCount(); col++) {
+                Cell h = new Cell().add(new Paragraph(tableModel.getColumnName(col)).setBold());
+                pdfTable.addCell(h);
+            }
+            for (int row = 0; row < tableModel.getRowCount(); row++) {
+                for (int col = 0; col < tableModel.getColumnCount(); col++) {
+                    Object v = tableModel.getValueAt(row, col);
+                    pdfTable.addCell(new Cell().add(new Paragraph(v == null ? "" : v.toString())));
+                }
+            }
+            document.add(pdfTable);
+            document.close();
+            
+            JOptionPane.showMessageDialog(this, "Exported to PDF successfully!");
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Export failed: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void exportExcel() {
+        javax.swing.JFileChooser fc = new javax.swing.JFileChooser();
+        fc.setSelectedFile(new java.io.File("attendance_report.xlsx"));
+        if (fc.showSaveDialog(this) != javax.swing.JFileChooser.APPROVE_OPTION) return;
+        try (Workbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Attendance");
+            
+            // Header row
+            org.apache.poi.ss.usermodel.Row headerRow = sheet.createRow(0);
+            CellStyle headerStyle = workbook.createCellStyle();
+            headerStyle.setFillForegroundColor(IndexedColors.TEAL.getIndex());
+            headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            
+            org.apache.poi.ss.usermodel.Font headerFont = workbook.createFont();
+            headerFont.setBold(true);
+            headerFont.setColor(IndexedColors.WHITE.getIndex());
+            headerStyle.setFont(headerFont);
+            
+            for (int col = 0; col < tableModel.getColumnCount(); col++) {
+                org.apache.poi.ss.usermodel.Cell cell = headerRow.createCell(col);
+                cell.setCellValue(tableModel.getColumnName(col));
+                cell.setCellStyle(headerStyle);
+            }
+            
+            // Data rows
+            for (int row = 0; row < tableModel.getRowCount(); row++) {
+                org.apache.poi.ss.usermodel.Row excelRow = sheet.createRow(row + 1);
+                for (int col = 0; col < tableModel.getColumnCount(); col++) {
+                    Object v = tableModel.getValueAt(row, col);
+                    org.apache.poi.ss.usermodel.Cell cell = excelRow.createCell(col);
+                    if (v != null) {
+                        if (v instanceof Number) {
+                            cell.setCellValue(((Number) v).doubleValue());
+                        } else {
+                            cell.setCellValue(v.toString());
+                        }
+                    }
+                }
+            }
+            
+            // Auto-size columns
+            for (int col = 0; col < tableModel.getColumnCount(); col++) {
+                sheet.autoSizeColumn(col);
+            }
+            
+            // Stats sheet
+            Sheet statsSheet = workbook.createSheet("Statistics");
+            org.apache.poi.ss.usermodel.Row row1 = statsSheet.createRow(0);
+            row1.createCell(0).setCellValue("Metric");
+            row1.createCell(1).setCellValue("Value");
+            
+            org.apache.poi.ss.usermodel.Row row2 = statsSheet.createRow(1);
+            row2.createCell(0).setCellValue("Present");
+            row2.createCell(1).setCellValue(lblPresent.getText());
+            
+            org.apache.poi.ss.usermodel.Row row3 = statsSheet.createRow(2);
+            row3.createCell(0).setCellValue("Late");
+            row3.createCell(1).setCellValue(lblLate.getText());
+            
+            org.apache.poi.ss.usermodel.Row row4 = statsSheet.createRow(3);
+            row4.createCell(0).setCellValue("Absent");
+            row4.createCell(1).setCellValue(lblAbsent.getText());
+            
+            org.apache.poi.ss.usermodel.Row row5 = statsSheet.createRow(4);
+            row5.createCell(0).setCellValue("Penalty");
+            row5.createCell(1).setCellValue(lblPenalty.getText());
+            
+            try (FileOutputStream fos = new FileOutputStream(fc.getSelectedFile())) {
+                workbook.write(fos);
+            }
+            
+            JOptionPane.showMessageDialog(this, "Exported to Excel successfully!");
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, "Export failed: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
         }
