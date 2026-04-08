@@ -35,7 +35,11 @@ public class PasswordUtil {
     }
 
     public static boolean verifyPassword(String rawPassword, String hashedPassword) {
-        return hashPassword(rawPassword).equals(hashedPassword);
+        if (hashedPassword == null) return false;
+        if (hashedPassword.matches("[0-9a-fA-F]{64}")) {
+            return hashPassword(rawPassword).equalsIgnoreCase(hashedPassword);
+        }
+        return rawPassword.equals(hashedPassword);
     }
 
     public static PasswordStrengthResult checkPasswordStrength(String password) {

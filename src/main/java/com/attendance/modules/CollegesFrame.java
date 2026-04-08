@@ -129,7 +129,7 @@ public class CollegesFrame extends JFrame {
             userPst.setString(2, txtDeanMiddle.getText().trim());
             userPst.setString(3, txtDeanLast.getText().trim());
             userPst.setString(4, username);
-            userPst.setString(5, "123456");
+            userPst.setString(5, com.attendance.util.PasswordUtil.hashPassword("123456"));
             userPst.executeUpdate();
             rs = userPst.getGeneratedKeys();
             rs.next();
