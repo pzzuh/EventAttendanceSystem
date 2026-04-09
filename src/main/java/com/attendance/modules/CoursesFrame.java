@@ -120,7 +120,7 @@ public class CoursesFrame extends JFrame {
     private void loadTable(String s){
         tableModel.setRowCount(0);
         String sql="SELECT c.id,d.department_name,c.course_name FROM courses c JOIN departments d ON d.id=c.department_id" +
-            (s.isEmpty()?"":" WHERE c.course_name LIKE '%"+s+"%'")+" ORDER BY c.course_name";
+            (s.isEmpty()?"": " WHERE CAST(c.id AS CHAR) LIKE '%"+s+"%' OR c.course_name LIKE '%"+s+"%' OR d.department_name LIKE '%"+s+"%'")+" ORDER BY c.course_name";
         try(Connection c=DatabaseConnection.getConnection(); ResultSet rs=c.createStatement().executeQuery(sql)){
             while(rs.next()) tableModel.addRow(new Object[]{rs.getInt(1),rs.getString(2),rs.getString(3)});
         }catch(SQLException e){e.printStackTrace();}

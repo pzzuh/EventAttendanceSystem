@@ -99,8 +99,7 @@ public class SignupFrame extends JFrame {
         g.gridx = 2; card.add(UITheme.fieldLabel("SECURITY QUESTION *"), g);
         g.gridy = 11;
         g.gridx = 0;
-        cmbRole = UITheme.styledCombo(new String[]{"Select Role","Super Admin","Program Head",
-            "Department President","Department Secretary","Department Treasurer"});
+        cmbRole = UITheme.styledCombo(new String[]{"Select Role","Super Admin","Dean","Program Head"});
         card.add(cmbRole, g);
         g.gridx = 2;
         cmbSecQ = UITheme.styledCombo(new String[]{"Select question",

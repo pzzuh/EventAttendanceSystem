@@ -123,7 +123,7 @@ public class CollegesFrame extends JFrame {
 
             // Create dean user
             String username = txtDeanFirst.getText().toLowerCase() + "." + txtDeanLast.getText().toLowerCase();
-            String userSql = "INSERT INTO users (first_name, middle_name, last_name, username, password, role, status) VALUES (?, ?, ?, ?, ?, 'Super Admin', 'Active')";
+            String userSql = "INSERT INTO users (first_name, middle_name, last_name, username, password, role, status) VALUES (?, ?, ?, ?, ?, 'Dean', 'Active')";
             PreparedStatement userPst = DatabaseConnection.getConnection().prepareStatement(userSql, Statement.RETURN_GENERATED_KEYS);
             userPst.setString(1, txtDeanFirst.getText().trim());
             userPst.setString(2, txtDeanMiddle.getText().trim());
@@ -195,20 +195,32 @@ public class CollegesFrame extends JFrame {
     private void loadTable(String search) {
         tableModel.setRowCount(0);
         try {
-            String sql = "SELECT c.id, c.college_name, CONCAT(c.dean_first_name, ' ', c.dean_last_name) as dean, u.status FROM colleges c LEFT JOIN users u ON c.dean_user_id = u.id";
+            String sql = "SELECT c.id, c.college_name, COALESCE(NULLIF(CONCAT(c.dean_first_name, ' ', c.dean_last_name), ' '), CONCAT(u.first_name, ' ', u.last_name)) AS dean, COALESCE(u.status, 'N/A') AS status " +
+                "FROM colleges c LEFT JOIN users u ON c.dean_user_id = u.id";
             if (!search.isEmpty()) {
-                sql += " WHERE c.college_name LIKE ?";
+                sql += " WHERE CAST(c.id AS CHAR) LIKE ? OR c.college_name LIKE ? OR c.dean_first_name LIKE ? OR c.dean_last_name LIKE ? OR CONCAT(c.dean_first_name, ' ', c.dean_last_name) LIKE ? " +
+                       "OR u.first_name LIKE ? OR u.last_name LIKE ? OR CONCAT(u.first_name, ' ', u.last_name) LIKE ? OR u.username LIKE ? OR u.status LIKE ?";
             }
             sql += " ORDER BY c.college_name ASC";
             PreparedStatement pst = DatabaseConnection.getConnection().prepareStatement(sql);
             if (!search.isEmpty()) {
-                pst.setString(1, "%" + search + "%");
+                String pattern = "%" + search + "%";
+                pst.setString(1, pattern);
+                pst.setString(2, pattern);
+                pst.setString(3, pattern);
+                pst.setString(4, pattern);
+                pst.setString(5, pattern);
+                pst.setString(6, pattern);
+                pst.setString(7, pattern);
+                pst.setString(8, pattern);
+                pst.setString(9, pattern);
+                pst.setString(10, pattern);
             }
             ResultSet rs = pst.executeQuery();
             while (rs.next()) {
                 tableModel.addRow(new Object[]{
                     rs.getInt("id"), rs.getString("college_name"), rs.getString("dean"),
-                    rs.getString("status") != null ? rs.getString("status") : "N/A"
+                    rs.getString("status")
                 });
             }
             rs.close();

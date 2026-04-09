@@ -65,7 +65,7 @@ public class UsersFrame extends JFrame {
 
         g.gridy = row; g.gridwidth = 1;
         g.gridx = 0; g.gridwidth = 2;
-        cmbRole = UITheme.styledCombo(new String[]{"Super Admin", "Program Head", "Department President", "Department Secretary", "Department Treasurer"});
+        cmbRole = UITheme.styledCombo(new String[]{"Super Admin", "Dean", "Program Head"});
         form.add(cmbRole, g);
         g.gridx = 2; g.gridwidth = 1;
         cmbStatus = UITheme.styledCombo(new String[]{"Active", "Inactive"});
@@ -186,7 +186,7 @@ public class UsersFrame extends JFrame {
         try {
             String sql = "SELECT * FROM users";
             if (!search.isEmpty()) {
-                sql += " WHERE first_name LIKE ? OR last_name LIKE ? OR username LIKE ?";
+                sql += " WHERE CAST(id AS CHAR) LIKE ? OR first_name LIKE ? OR last_name LIKE ? OR username LIKE ? OR role LIKE ? OR status LIKE ?";
             }
             sql += " ORDER BY first_name ASC";
             PreparedStatement pst = DatabaseConnection.getConnection().prepareStatement(sql);
@@ -195,6 +195,9 @@ public class UsersFrame extends JFrame {
                 pst.setString(1, pattern);
                 pst.setString(2, pattern);
                 pst.setString(3, pattern);
+                pst.setString(4, pattern);
+                pst.setString(5, pattern);
+                pst.setString(6, pattern);
             }
             ResultSet rs = pst.executeQuery();
             while (rs.next()) {

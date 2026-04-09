@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS users (
     password    VARCHAR(255) NOT NULL,  -- SHA-256 hash
     role        ENUM(
                     'Super Admin',
+                    'Dean',
                     'Program Head',
                     'Department President',
                     'Department Secretary',

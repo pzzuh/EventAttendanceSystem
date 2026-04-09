@@ -91,7 +91,7 @@ public class DepartmentsFrame extends JFrame {
         filterBar.add(new JLabel("Search:") {{ setFont(UITheme.FONT_SMALL); }});
         filterBar.add(txtSearch); filterBar.add(btnSearch);
 
-        String[] cols = {"ID", "College", "Department Name", "Coordinator"};
+        String[] cols = {"ID", "College", "Department Name", "Coordinator", "Status"};
         tableModel = new DefaultTableModel(cols, 0) {
             public boolean isCellEditable(int r, int c) { return false; }
         };
@@ -193,14 +193,33 @@ public class DepartmentsFrame extends JFrame {
     private void loadTable(String search) {
         tableModel.setRowCount(0);
         String sql = "SELECT d.id, c.college_name, d.department_name, " +
-            "COALESCE(d.coordinator_first_name,'') || ' ' || COALESCE(d.coordinator_last_name,'') " +
-            "FROM departments d JOIN colleges c ON c.id=d.college_id" +
-            (search.isEmpty() ? "" : " WHERE d.department_name LIKE '%" + search + "%' OR c.college_name LIKE '%" + search + "%'") +
+            "COALESCE(NULLIF(CONCAT(d.coordinator_first_name, ' ', d.coordinator_last_name), ' '), CONCAT(u.first_name, ' ', u.last_name)) AS coordinator, " +
+            "COALESCE(u.status, 'N/A') AS status " +
+            "FROM departments d JOIN colleges c ON c.id=d.college_id " +
+            "LEFT JOIN users u ON d.coordinator_user_id = u.id" +
+            (search.isEmpty() ? "" : " WHERE CAST(d.id AS CHAR) LIKE ? OR c.college_name LIKE ? OR d.department_name LIKE ? OR d.coordinator_first_name LIKE ? OR d.coordinator_last_name LIKE ? " +
+                "OR CONCAT(d.coordinator_first_name, ' ', d.coordinator_last_name) LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR CONCAT(u.first_name, ' ', u.last_name) LIKE ? OR u.username LIKE ? OR u.status LIKE ?") +
             " ORDER BY c.college_name, d.department_name";
         try (Connection conn = DatabaseConnection.getConnection();
-             ResultSet rs = conn.createStatement().executeQuery(sql)) {
+             PreparedStatement pst = conn.prepareStatement(sql)) {
+            if (!search.isEmpty()) {
+                String pattern = "%" + search + "%";
+                pst.setString(1, pattern);
+                pst.setString(2, pattern);
+                pst.setString(3, pattern);
+                pst.setString(4, pattern);
+                pst.setString(5, pattern);
+                pst.setString(6, pattern);
+                pst.setString(7, pattern);
+                pst.setString(8, pattern);
+                pst.setString(9, pattern);
+                pst.setString(10, pattern);
+                pst.setString(11, pattern);
+            }
+            ResultSet rs = pst.executeQuery();
             while (rs.next()) tableModel.addRow(new Object[]{
-                rs.getInt(1), rs.getString(2), rs.getString(3), rs.getString(4)});
+                rs.getInt(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5)});
+            rs.close();
         } catch (SQLException e) { e.printStackTrace(); }
     }
 }

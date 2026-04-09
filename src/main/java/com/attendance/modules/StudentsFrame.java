@@ -110,8 +110,9 @@ public class StudentsFrame extends JFrame {
         filterBar.setBorder(new CompoundBorder(new LineBorder(UITheme.BORDER_COLOR, 1, true), BorderFactory.createEmptyBorder(4, 8, 4, 8)));
         filterBar.add(new JLabel("Search:") {{ setFont(UITheme.FONT_SMALL); }});
         txtSearch = UITheme.styledField(); txtSearch.setPreferredSize(new Dimension(150, 32));
+        txtSearch.addActionListener(e -> loadTable(txtSearch.getText().trim(), (String) cmbFilterDept.getSelectedItem(), (String) cmbFilterCourse.getSelectedItem()));
         JButton btnSearch = UITheme.primaryButton("Search");
-        btnSearch.addActionListener(e -> loadTable(txtSearch.getText().trim(), null, null));
+        btnSearch.addActionListener(e -> loadTable(txtSearch.getText().trim(), (String) cmbFilterDept.getSelectedItem(), (String) cmbFilterCourse.getSelectedItem()));
         filterBar.add(txtSearch); filterBar.add(btnSearch);
         
         filterBar.add(Box.createHorizontalStrut(20));
@@ -307,7 +308,7 @@ public class StudentsFrame extends JFrame {
         tableModel.setRowCount(0);
         try {
             String sql = "SELECT s.id, s.student_id_number, s.first_name, s.last_name, d.department_name, c.course_name, s.year_level FROM students s JOIN departments d ON s.department_id=d.id JOIN courses c ON s.course_id=c.id WHERE 1=1";
-            if (!search.isEmpty()) sql += " AND (s.first_name LIKE '%" + search + "%' OR s.last_name LIKE '%" + search + "%' OR s.student_id_number LIKE '%" + search + "%')";
+            if (!search.isEmpty()) sql += " AND (CAST(s.id AS CHAR) LIKE '%" + search + "%' OR s.student_id_number LIKE '%" + search + "%' OR s.first_name LIKE '%" + search + "%' OR s.last_name LIKE '%" + search + "%' OR d.department_name LIKE '%" + search + "%' OR c.course_name LIKE '%" + search + "%' OR s.year_level LIKE '%" + search + "%')";
             if (filterDept != null && !filterDept.equals("All Departments")) sql += " AND d.department_name='" + filterDept + "'";
             if (filterCourse != null && !filterCourse.equals("All Courses")) sql += " AND c.course_name='" + filterCourse + "'";
             sql += " ORDER BY s.first_name ASC";
