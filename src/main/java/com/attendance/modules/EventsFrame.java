@@ -18,7 +18,7 @@ public class EventsFrame extends JFrame {
     private int selectedId = -1;
 
     public EventsFrame() {
-        setTitle("AttendX — Events");
+        setTitle("Attendance System — Events");
         setSize(1060, 680);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);

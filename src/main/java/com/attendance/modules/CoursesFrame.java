@@ -17,7 +17,7 @@ public class CoursesFrame extends JFrame {
     private int selectedId = -1;
 
     public CoursesFrame() {
-        setTitle("AttendX — Courses");
+        setTitle("Attendance System — Courses");
         setSize(820, 560);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);

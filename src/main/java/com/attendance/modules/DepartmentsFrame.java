@@ -18,7 +18,7 @@ public class DepartmentsFrame extends JFrame {
     private int selectedId = -1;
 
     public DepartmentsFrame() {
-        setTitle("AttendX — Departments");
+        setTitle("Attendance System — Departments");
         setSize(960, 620);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);

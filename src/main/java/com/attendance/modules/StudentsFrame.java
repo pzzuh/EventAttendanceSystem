@@ -22,7 +22,7 @@ public class StudentsFrame extends JFrame {
     private int selectedId = -1;
 
     public StudentsFrame() {
-        setTitle("AttendX — Students");
+        setTitle("Attendance System — Students");
         setSize(1200, 750);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);

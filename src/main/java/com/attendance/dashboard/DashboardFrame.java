@@ -5,6 +5,18 @@ import com.attendance.modules.*;
 import com.attendance.util.Session;
 import com.attendance.util.UITheme;
 
+import org.jfree.chart.ChartFactory;
+import org.jfree.chart.ChartPanel;
+import org.jfree.chart.JFreeChart;
+import org.jfree.chart.axis.CategoryLabelPositions;
+import org.jfree.chart.labels.StandardCategoryItemLabelGenerator;
+import org.jfree.chart.plot.CategoryPlot;
+import org.jfree.chart.plot.PiePlot;
+import org.jfree.chart.plot.PlotOrientation;
+import org.jfree.chart.renderer.category.BarRenderer;
+import org.jfree.data.category.DefaultCategoryDataset;
+import org.jfree.data.general.DefaultPieDataset;
+
 import javax.swing.*;
 import javax.swing.border.*;
 import java.awt.*;
@@ -13,6 +25,9 @@ import java.awt.event.WindowEvent;
 import java.sql.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 public class DashboardFrame extends JFrame {
 
@@ -20,6 +35,9 @@ public class DashboardFrame extends JFrame {
     private JLabel lblClock, lblTopTitle;
     private JLabel lblColleges, lblDepts, lblStudents, lblCourses, lblUsers, lblEvents;
     private JButton activeSideBtn = null;
+    private DefaultCategoryDataset collegeDataset;
+    private DefaultPieDataset<String> overviewDataset;
+    private Timer chartRefreshTimer;
 
     // Sidebar collapse state
     private JPanel sidebar;
@@ -35,13 +53,14 @@ public class DashboardFrame extends JFrame {
     private JLabel nameL, roleL;
 
     public DashboardFrame() {
-        setTitle("AttendX — Dashboard");
+        setTitle("Attendance System — Dashboard");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setSize(1200, 730);
         setMinimumSize(new Dimension(900, 600));
         setLocationRelativeTo(null);
         buildUI();
         startClock();
+        startChartRefresh();
     }
 
     private void buildUI() {
@@ -62,7 +81,7 @@ public class DashboardFrame extends JFrame {
         logoPane.setMinimumSize(new Dimension(SIDEBAR_COLLAPSED_W, 56));
         logoPane.setBorder(BorderFactory.createEmptyBorder(0, 14, 0, 6));
 
-        logoLbl = new JLabel("◈  AttendX");
+        logoLbl = new JLabel("◈  Attendance System");
         logoLbl.setFont(new Font("Segoe UI", Font.BOLD, 17));
         logoLbl.setForeground(UITheme.ACCENT);
 
@@ -362,6 +381,14 @@ public class DashboardFrame extends JFrame {
         home.add(stats);
         home.add(Box.createVerticalStrut(22));
 
+        JPanel chartRow = new JPanel(new GridLayout(1, 2, 12, 0));
+        chartRow.setOpaque(false);
+        chartRow.setAlignmentX(LEFT_ALIGNMENT);
+        chartRow.add(chartCard("Student Population per College", createCollegePopulationChart()));
+        chartRow.add(chartCard("System Overview", createSystemOverviewChart()));
+        home.add(chartRow);
+        home.add(Box.createVerticalStrut(22));
+
         // Quick access
         JLabel qaLbl = new JLabel("Quick Access");
         qaLbl.setFont(new Font("Segoe UI", Font.BOLD, 14));
@@ -426,6 +453,102 @@ public class DashboardFrame extends JFrame {
         return c;
     }
 
+    private JPanel chartCard(String title, ChartPanel chartPanel) {
+        JPanel card = new JPanel(new BorderLayout());
+        card.setBackground(Color.WHITE);
+        card.setBorder(new CompoundBorder(
+            new LineBorder(UITheme.BORDER_COLOR, 1, true),
+            BorderFactory.createEmptyBorder(14, 14, 14, 14)));
+        JLabel lbl = new JLabel(title);
+        lbl.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        lbl.setForeground(UITheme.TEXT_PRIMARY);
+        card.add(lbl, BorderLayout.NORTH);
+        chartPanel.setPreferredSize(new Dimension(0, 300));
+        chartPanel.setBackground(Color.WHITE);
+        chartPanel.setPopupMenu(null);
+        chartPanel.setMouseWheelEnabled(false);
+        card.add(chartPanel, BorderLayout.CENTER);
+        return card;
+    }
+
+    private ChartPanel createCollegePopulationChart() {
+        DefaultCategoryDataset dataset = new DefaultCategoryDataset();
+        collegeDataset = dataset;
+        try (Connection c = DatabaseConnection.getConnection();
+             PreparedStatement ps = c.prepareStatement(
+                 "SELECT c.college_name, COUNT(s.id) AS total " +
+                 "FROM colleges c LEFT JOIN students s ON s.college_id = c.id " +
+                 "GROUP BY c.id, c.college_name ORDER BY total DESC")) {
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    String collegeName = rs.getString("college_name");
+                    String category = abbreviateCollegeName(collegeName);
+                    dataset.addValue(rs.getInt("total"), "Students", category);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        if (dataset.getColumnCount() == 0) {
+            dataset.addValue(0, "Students", "No data");
+        }
+        JFreeChart chart = ChartFactory.createBarChart(
+            null,
+            "College",
+            "Students",
+            dataset,
+            PlotOrientation.VERTICAL,
+            false,
+            true,
+            false);
+        CategoryPlot plot = chart.getCategoryPlot();
+        plot.setBackgroundPaint(Color.WHITE);
+        plot.setRangeGridlinePaint(UITheme.BORDER_COLOR);
+        plot.setOutlineVisible(false);
+        plot.getDomainAxis().setCategoryLabelPositions(CategoryLabelPositions.UP_45);
+
+        BarRenderer renderer = new BarRenderer();
+        renderer.setDefaultItemLabelGenerator(new StandardCategoryItemLabelGenerator());
+        renderer.setDefaultItemLabelsVisible(true);
+        renderer.setDefaultItemLabelFont(new Font("Segoe UI", Font.BOLD, 11));
+        plot.setRenderer(renderer);
+
+        chart.setBackgroundPaint(UITheme.BG_MAIN);
+        return new ChartPanel(chart, false);
+    }
+
+    private ChartPanel createSystemOverviewChart() {
+        overviewDataset = new DefaultPieDataset<>();
+        try (Connection c = DatabaseConnection.getConnection()) {
+            refreshOverviewData(c);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        if (overviewDataset.getItemCount() == 0) {
+            overviewDataset.setValue("No data", 1);
+        }
+        JFreeChart chart = ChartFactory.createPieChart(
+            null,
+            overviewDataset,
+            true,
+            true,
+            false);
+        @SuppressWarnings("unchecked")
+        PiePlot<String> plot = (PiePlot<String>) chart.getPlot();
+        plot.setBackgroundPaint(Color.WHITE);
+        plot.setOutlineVisible(false);
+        plot.setLabelBackgroundPaint(new Color(255,255,255,200));
+        plot.setLabelOutlinePaint(null);
+        plot.setLabelShadowPaint(null);
+        chart.setBackgroundPaint(UITheme.BG_MAIN);
+        return new ChartPanel(chart, false);
+    }
+
+    private int cntInt(Connection c, String t) throws SQLException {
+        ResultSet rs = c.createStatement().executeQuery("SELECT COUNT(*) FROM " + t);
+        return rs.next() ? rs.getInt(1) : 0;
+    }
+
     public void refreshStats() {
         try (Connection c = DatabaseConnection.getConnection()) {
             if (lblColleges != null) lblColleges.setText(cnt(c, "colleges"));
@@ -434,7 +557,65 @@ public class DashboardFrame extends JFrame {
             if (lblCourses  != null) lblCourses.setText(cnt(c, "courses"));
             if (lblUsers    != null) lblUsers.setText(cnt(c, "users"));
             if (lblEvents   != null) lblEvents.setText(cnt(c, "events"));
+            refreshCollegePopulationData(c);
+            refreshOverviewData(c);
         } catch (SQLException e) { e.printStackTrace(); }
+    }
+
+    private void refreshCollegePopulationData(Connection c) throws SQLException {
+        if (collegeDataset == null) return;
+        collegeDataset.clear();
+        try (PreparedStatement ps = c.prepareStatement(
+                "SELECT c.college_name, COUNT(s.id) AS total " +
+                "FROM colleges c LEFT JOIN students s ON s.college_id = c.id " +
+                "GROUP BY c.id, c.college_name ORDER BY total DESC")) {
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    String collegeName = rs.getString("college_name");
+                    String category = abbreviateCollegeName(collegeName);
+                    collegeDataset.addValue(rs.getInt("total"), "Students", category);
+                }
+            }
+        }
+        if (collegeDataset.getColumnCount() == 0) {
+            collegeDataset.addValue(0, "Students", "No data");
+        }
+    }
+
+    private void refreshOverviewData(Connection c) throws SQLException {
+        if (overviewDataset == null) return;
+        overviewDataset.clear();
+        overviewDataset.setValue("Students", cntInt(c, "students"));
+        overviewDataset.setValue("Users", cntInt(c, "users"));
+        overviewDataset.setValue("Events", cntInt(c, "events"));
+        overviewDataset.setValue("Colleges", cntInt(c, "colleges"));
+        overviewDataset.setValue("Departments", cntInt(c, "departments"));
+        overviewDataset.setValue("Courses", cntInt(c, "courses"));
+    }
+
+    private String abbreviateCollegeName(String name) {
+        if (name == null || name.isBlank()) return "Unknown";
+        List<String> parts = new ArrayList<>();
+        for (String word : name.split("\\s+")) {
+            String clean = word.replaceAll("[^A-Za-z0-9]", "");
+            if (clean.isBlank()) continue;
+            String lower = clean.toLowerCase();
+            if (Arrays.asList("of", "and", "&", "the", "for").contains(lower)) continue;
+            if (parts.isEmpty() && lower.equals("college")) continue;
+            parts.add(clean);
+        }
+        if (parts.isEmpty()) {
+            return name.length() <= 8 ? name : name.substring(0, 8).toUpperCase();
+        }
+        if (parts.size() == 1) {
+            String single = parts.get(0).toUpperCase();
+            return single.length() <= 6 ? single : single.substring(0, 6);
+        }
+        StringBuilder abbr = new StringBuilder();
+        for (String part : parts) {
+            abbr.append(Character.toUpperCase(part.charAt(0)));
+        }
+        return abbr.toString();
     }
 
     private String cnt(Connection c, String t) throws SQLException {
@@ -449,8 +630,14 @@ public class DashboardFrame extends JFrame {
         t.start();
     }
 
+    private void startChartRefresh() {
+        chartRefreshTimer = new Timer(5000, e -> refreshStats());
+        chartRefreshTimer.setInitialDelay(5000);
+        chartRefreshTimer.start();
+    }
+
     private void doLogout() {
-        int c = JOptionPane.showConfirmDialog(this, "Sign out of AttendX?", "Confirm", JOptionPane.YES_NO_OPTION);
+        int c = JOptionPane.showConfirmDialog(this, "Sign out of Attendance System?", "Confirm", JOptionPane.YES_NO_OPTION);
         if (c == JOptionPane.YES_OPTION) {
             Session.logout();
             dispose();

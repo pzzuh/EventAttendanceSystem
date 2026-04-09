@@ -16,7 +16,7 @@ public class LoginFrame extends JFrame {
     private JLabel lblError;
 
     public LoginFrame() {
-        setTitle("AttendX — Sign In");
+        setTitle("Attendance System — Login");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setSize(960, 580);
         setLocationRelativeTo(null);
@@ -55,7 +55,7 @@ public class LoginFrame extends JFrame {
         appIcon.setForeground(UITheme.ACCENT);
         appIcon.setAlignmentX(CENTER_ALIGNMENT);
 
-        JLabel appName = new JLabel("AttendX");
+        JLabel appName = new JLabel("Attendance System");
         appName.setFont(new Font("Segoe UI", Font.BOLD, 36));
         appName.setForeground(Color.WHITE);
         appName.setAlignmentX(CENTER_ALIGNMENT);
@@ -99,7 +99,7 @@ public class LoginFrame extends JFrame {
         g.insets = new Insets(4, 0, 4, 0);
 
         g.gridx = 0; g.gridy = 0;
-        JLabel h1 = new JLabel("Sign in");
+        JLabel h1 = new JLabel("Login");
         h1.setFont(new Font("Segoe UI", Font.BOLD, 24));
         h1.setForeground(UITheme.TEXT_PRIMARY);
         card.add(h1, g);
@@ -130,26 +130,14 @@ public class LoginFrame extends JFrame {
         txtPassword.setPreferredSize(new Dimension(320, 40));
         card.add(txtPassword, g);
 
-        // Forgot row
-        g.gridy = 7; g.insets = new Insets(0, 0, 8, 0);
-        JPanel forgotRow = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
-        forgotRow.setOpaque(false);
-        JButton btnForgot = new JButton("Forgot password?");
-        btnForgot.setFont(UITheme.FONT_SMALL); btnForgot.setForeground(UITheme.ACCENT);
-        btnForgot.setBorderPainted(false); btnForgot.setContentAreaFilled(false);
-        btnForgot.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        btnForgot.addActionListener(e -> new ForgotPasswordFrame(this).setVisible(true));
-        forgotRow.add(btnForgot);
-        card.add(forgotRow, g);
-
-        g.gridy = 8; g.insets = new Insets(0, 0, 6, 0);
+        g.gridy = 7; g.insets = new Insets(0, 0, 6, 0);
         lblError = new JLabel(" ");
         lblError.setFont(UITheme.FONT_SMALL);
         lblError.setForeground(UITheme.DANGER);
         card.add(lblError, g);
 
-        g.gridy = 9; g.insets = new Insets(0, 0, 16, 0);
-        JButton btnLogin = new JButton("Sign In →");
+        g.gridy = 8; g.insets = new Insets(0, 0, 16, 0);
+        JButton btnLogin = new JButton("Login");
         btnLogin.setFont(new Font("Segoe UI", Font.BOLD, 14));
         btnLogin.setBackground(UITheme.ACCENT); btnLogin.setForeground(Color.WHITE);
         btnLogin.setFocusPainted(false); btnLogin.setBorderPainted(false); btnLogin.setOpaque(true);
@@ -157,19 +145,6 @@ public class LoginFrame extends JFrame {
         btnLogin.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         btnLogin.addActionListener(e -> doLogin());
         card.add(btnLogin, g);
-
-        g.gridy = 10; g.insets = new Insets(0, 0, 0, 0);
-        JPanel regRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 0));
-        regRow.setOpaque(false);
-        JLabel noAcc = new JLabel("Don't have an account?");
-        noAcc.setFont(UITheme.FONT_SMALL); noAcc.setForeground(UITheme.TEXT_MUTED);
-        JButton btnReg = new JButton("Register here");
-        btnReg.setFont(new Font("Segoe UI", Font.BOLD, 11)); btnReg.setForeground(UITheme.ACCENT);
-        btnReg.setBorderPainted(false); btnReg.setContentAreaFilled(false);
-        btnReg.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        btnReg.addActionListener(e -> { dispose(); new SignupFrame().setVisible(true); });
-        regRow.add(noAcc); regRow.add(btnReg);
-        card.add(regRow, g);
 
         right.add(card);
 

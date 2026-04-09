@@ -18,7 +18,7 @@ public class UsersFrame extends JFrame {
     private int selectedId = -1;
 
     public UsersFrame() {
-        setTitle("AttendX — Users");
+        setTitle("Attendance System — Users");
         setSize(1020, 680);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);

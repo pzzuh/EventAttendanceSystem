@@ -17,7 +17,7 @@ public class SignupFrame extends JFrame {
     private JLabel lblStrength, lblError;
 
     public SignupFrame() {
-        setTitle("AttendX — Register");
+        setTitle("Attendance System — Register");
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
         setSize(860, 640);
         setLocationRelativeTo(null);
@@ -34,7 +34,7 @@ public class SignupFrame extends JFrame {
         header.setBackground(UITheme.SIDEBAR_BG);
         header.setPreferredSize(new Dimension(0, 56));
         header.setBorder(BorderFactory.createEmptyBorder(0, 24, 0, 24));
-        JLabel logo = new JLabel("◈  AttendX");
+        JLabel logo = new JLabel("◈  Attendance System");
         logo.setFont(new Font("Segoe UI", Font.BOLD, 17));
         logo.setForeground(UITheme.ACCENT);
         JLabel subtitle = new JLabel("Create your account");
