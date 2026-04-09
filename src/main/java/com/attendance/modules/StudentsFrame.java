@@ -78,13 +78,22 @@ public class StudentsFrame extends JFrame {
 
         g.gridy = row;
         g.gridx = 0; g.gridwidth = 2;
-        JPanel photoPanel = new JPanel(new BorderLayout(5, 0));
+        JPanel photoPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
         photoPanel.setOpaque(false);
-        lblPhotoPreview = new JLabel("No photo"); lblPhotoPreview.setFont(UITheme.FONT_SMALL); lblPhotoPreview.setForeground(Color.GRAY);
+        lblPhotoPreview = new JLabel("No photo");
+        lblPhotoPreview.setFont(UITheme.FONT_SMALL);
+        lblPhotoPreview.setForeground(Color.GRAY);
+        lblPhotoPreview.setPreferredSize(new Dimension(64, 64));
+        lblPhotoPreview.setHorizontalAlignment(JLabel.CENTER);
+        lblPhotoPreview.setVerticalAlignment(JLabel.CENTER);
+        lblPhotoPreview.setBorder(BorderFactory.createLineBorder(UITheme.BORDER_COLOR, 1));
         JButton btnUpload = UITheme.outlineButton("Upload Photo");
         btnUpload.addActionListener(e -> uploadPhoto());
-        photoPanel.add(btnUpload, BorderLayout.WEST);
-        photoPanel.add(lblPhotoPreview, BorderLayout.CENTER);
+        JButton btnRemovePhoto = UITheme.outlineButton("Remove");
+        btnRemovePhoto.addActionListener(e -> removePhoto());
+        photoPanel.add(btnUpload);
+        photoPanel.add(btnRemovePhoto);
+        photoPanel.add(lblPhotoPreview);
         form.add(photoPanel, g);
         g.gridx = 2; g.gridwidth = 1;
         cmbYearLevel = UITheme.styledCombo(new String[]{"First Year", "Second Year", "Third Year", "Fourth Year"});
@@ -160,12 +169,25 @@ public class StudentsFrame extends JFrame {
                 fis.read(bytes);
                 fis.close();
                 base64Photo = Base64.getEncoder().encodeToString(bytes);
-                lblPhotoPreview.setText("✓ Photo: " + file.getName());
-                lblPhotoPreview.setForeground(UITheme.SUCCESS);
+                showPhotoThumbnail(bytes);
             } catch (IOException e) {
                 JOptionPane.showMessageDialog(this, "Error uploading photo: " + e.getMessage());
             }
         }
+    }
+
+    private void removePhoto() {
+        base64Photo = "";
+        lblPhotoPreview.setIcon(null);
+        lblPhotoPreview.setText("No photo");
+        lblPhotoPreview.setForeground(Color.GRAY);
+    }
+
+    private void showPhotoThumbnail(byte[] bytes) {
+        ImageIcon icon = new ImageIcon(bytes);
+        Image scaled = icon.getImage().getScaledInstance(64, 64, Image.SCALE_SMOOTH);
+        lblPhotoPreview.setIcon(new ImageIcon(scaled));
+        lblPhotoPreview.setText("");
     }
 
     private void loadColleges() {
@@ -331,6 +353,45 @@ public class StudentsFrame extends JFrame {
         txtFirstName.setText((String) tableModel.getValueAt(row, 2));
         txtLastName.setText((String) tableModel.getValueAt(row, 3));
         cmbYearLevel.setSelectedItem((String) tableModel.getValueAt(row, 6));
+
+        // Load photo from DB
+        try {
+            PreparedStatement ps = DatabaseConnection.getConnection().prepareStatement(
+                "SELECT photo, middle_name, college_id, department_id, course_id FROM students WHERE id=?");
+            ps.setInt(1, selectedId);
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) {
+                txtMiddleName.setText(rs.getString("middle_name") != null ? rs.getString("middle_name") : "");
+                String photo = rs.getString("photo");
+                if (photo != null && !photo.isEmpty()) {
+                    base64Photo = photo;
+                    byte[] bytes = Base64.getDecoder().decode(photo);
+                    showPhotoThumbnail(bytes);
+                } else {
+                    removePhoto();
+                }
+                // Restore college/dept/course combos
+                int colId = rs.getInt("college_id");
+                int deptId = rs.getInt("department_id");
+                int courseId = rs.getInt("course_id");
+                selectComboById(cmbCollege, colId);
+                loadDepartments();
+                selectComboById(cmbDept, deptId);
+                loadCourses();
+                selectComboById(cmbCourse, courseId);
+            }
+            rs.close(); ps.close();
+        } catch (SQLException e) { e.printStackTrace(); }
+    }
+
+    private void selectComboById(JComboBox<String> combo, int id) {
+        for (int i = 0; i < combo.getItemCount(); i++) {
+            String item = (String) combo.getItemAt(i);
+            if (item != null && item.startsWith(id + "|")) {
+                combo.setSelectedIndex(i);
+                return;
+            }
+        }
     }
 
     private void clearForm() {
@@ -343,6 +404,7 @@ public class StudentsFrame extends JFrame {
         cmbCourse.setSelectedIndex(0);
         cmbYearLevel.setSelectedIndex(0);
         base64Photo = "";
+        lblPhotoPreview.setIcon(null);
         lblPhotoPreview.setText("No photo");
         lblPhotoPreview.setForeground(Color.GRAY);
         selectedId = -1;
