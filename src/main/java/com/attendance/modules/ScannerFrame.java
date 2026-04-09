@@ -74,14 +74,14 @@ public class ScannerFrame extends JFrame {
         eventPanel.add(UITheme.fieldLabel("Event"), g);
         g.gridx = 1;
         cmbEvent = UITheme.styledCombo(new String[]{"Loading events..."});
+        cmbEvent.addActionListener(e -> {
+            String sel = (String) cmbEvent.getSelectedItem();
+            if (sel != null && sel.contains("|")) loadSelectedEvent();
+        });
         eventPanel.add(cmbEvent, g);
 
-        g.gridx = 0; g.gridy = 2;
-        JButton btnLoadEvent = UITheme.primaryButton("Load Event");
-        btnLoadEvent.addActionListener(e -> loadSelectedEvent());
-        eventPanel.add(btnLoadEvent, g);
-        g.gridx = 1;
-        JButton btnRefreshEvent = UITheme.successButton("Refresh");
+        g.gridx = 0; g.gridy = 2; g.gridwidth = 2;
+        JButton btnRefreshEvent = UITheme.successButton("Refresh Events");
         btnRefreshEvent.addActionListener(e -> loadEventOptions());
         eventPanel.add(btnRefreshEvent, g);
 
@@ -138,25 +138,55 @@ public class ScannerFrame extends JFrame {
 
         s.gridy = 1;
         cmbStudentStatus = UITheme.styledCombo(new String[]{"— Pick a Student —"});
-        cmbStudentStatus.addActionListener(e -> updateStatusLookup());
+        cmbStudentStatus.addActionListener(e -> {
+            String item = (String) cmbStudentStatus.getSelectedItem();
+            if (item != null && item.contains("|")) {
+                String studentIdNumber = item.split("\\|")[1].split(" - ")[0].trim();
+                txtBarcode.setText(studentIdNumber);
+                updateStatusLookup();
+            } else {
+                updateStatusLookup();
+            }
+        });
         statusPanel.add(cmbStudentStatus, s);
 
         s.gridy = 2;
-        statusPanel.add(new JSeparator(), s);
+        JButton btnRecordAttendance = new JButton("✔ Record Attendance");
+        btnRecordAttendance.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        btnRecordAttendance.setBackground(new Color(79, 70, 229));
+        btnRecordAttendance.setForeground(Color.WHITE);
+        btnRecordAttendance.setFocusPainted(false);
+        btnRecordAttendance.setBorder(BorderFactory.createEmptyBorder(10, 16, 10, 16));
+        btnRecordAttendance.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        btnRecordAttendance.addActionListener(e -> {
+            String item = (String) cmbStudentStatus.getSelectedItem();
+            if (item == null || !item.contains("|")) {
+                JOptionPane.showMessageDialog(this, "Please select a student first.", "No Student Selected", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            String studentIdNumber = item.split("\\|")[1].split(" - ")[0].trim();
+            txtBarcode.setText(studentIdNumber);
+            processScan();
+            updateStatusLookup();
+        });
+        statusPanel.add(btnRecordAttendance, s);
 
         s.gridy = 3;
+        statusPanel.add(new JSeparator(), s);
+
+        s.gridy = 4;
         lblStatus = new JLabel("STATUS\n—");
         lblStatus.setFont(new Font("Segoe UI", Font.BOLD, 16));
         lblStatus.setForeground(UITheme.TEXT_SECONDARY);
         statusPanel.add(lblStatus, s);
 
-        s.gridy = 4;
+        s.gridy = 5;
         lblStatusTimeIn = new JLabel("TIME IN\n—");
         lblStatusTimeIn.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         lblStatusTimeIn.setForeground(UITheme.TEXT_SECONDARY);
         statusPanel.add(lblStatusTimeIn, s);
 
-        s.gridy = 5;
+        s.gridy = 6;
         lblStatusPenalty = new JLabel("PENALTY FEE\n₱0.00");
         lblStatusPenalty.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         lblStatusPenalty.setForeground(UITheme.TEXT_SECONDARY);
@@ -178,13 +208,7 @@ public class ScannerFrame extends JFrame {
         txtBarcode.setFont(new Font("Monospace", Font.PLAIN, 20));
         txtBarcode.setBorder(new LineBorder(UITheme.BORDER_COLOR, 1, true));
         txtBarcode.addActionListener(e -> processScan());
-        btnBrowseStudents = UITheme.outlineButton("Browse Students");
-        btnBrowseStudents.addActionListener(e -> {
-            searchResultsPanel.setVisible(true);
-            txtSearch.requestFocusInWindow();
-        });
         scanInput.add(txtBarcode, BorderLayout.CENTER);
-        scanInput.add(btnBrowseStudents, BorderLayout.EAST);
 
         lblScanMessage = new JLabel("Load an event first, then scan a barcode or search for a student.");
         lblScanMessage.setFont(UITheme.FONT_SMALL);
@@ -193,12 +217,12 @@ public class ScannerFrame extends JFrame {
         JPanel searchBar = new JPanel(new BorderLayout(10, 0));
         searchBar.setOpaque(false);
         txtSearch = UITheme.styledField();
-        txtSearch.setToolTipText("Search by student ID, name, college, department, or course");
-        txtSearch.addActionListener(e -> searchStudents());
+        txtSearch.setToolTipText("Filter live attendance by student ID or name");
+        txtSearch.addActionListener(e -> filterLiveAttendance());
         JButton btnSearch = UITheme.primaryButton("Search");
-        btnSearch.addActionListener(e -> searchStudents());
+        btnSearch.addActionListener(e -> filterLiveAttendance());
         JButton btnClear = UITheme.outlineButton("Clear");
-        btnClear.addActionListener(e -> clearSearch());
+        btnClear.addActionListener(e -> { txtSearch.setText(""); loadRecentScans(); });
         JPanel searchControls = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         searchControls.setOpaque(false);
         searchControls.add(btnClear);
@@ -206,29 +230,12 @@ public class ScannerFrame extends JFrame {
         searchBar.add(txtSearch, BorderLayout.CENTER);
         searchBar.add(searchControls, BorderLayout.EAST);
 
+        // Keep searchResultsPanel as hidden (never shown) for code compatibility
         searchResultsPanel = new JPanel(new BorderLayout());
-        searchResultsPanel.setBackground(Color.WHITE);
-        searchResultsPanel.setBorder(new LineBorder(UITheme.BORDER_COLOR, 1, true));
         searchResultsPanel.setVisible(false);
-        JLabel searchLabel = new JLabel("Search Results");
-        searchLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
-        searchLabel.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
-        searchLabel.setOpaque(true);
-        searchLabel.setBackground(new Color(249, 250, 251));
-        searchResultsPanel.add(searchLabel, BorderLayout.NORTH);
         String[] searchCols = {"Student ID", "Student Name", "College", "Department", "Course"};
         searchModel = new DefaultTableModel(searchCols, 0) { public boolean isCellEditable(int r, int c) { return false; } };
         searchTable = new JTable(searchModel);
-        UITheme.styleTable(searchTable);
-        searchTable.getSelectionModel().addListSelectionListener(e -> {
-            if (!e.getValueIsAdjusting() && searchTable.getSelectedRow() >= 0) {
-                String selectedId = (String) searchModel.getValueAt(searchTable.getSelectedRow(), 0);
-                txtBarcode.setText(selectedId);
-                cmbStudentStatus.setSelectedItem(findStudentStatusItem(selectedId));
-                searchResultsPanel.setVisible(false);
-            }
-        });
-        searchResultsPanel.add(UITheme.styledScrollPane(searchTable), BorderLayout.CENTER);
 
         JPanel scanCenter = new JPanel(new BorderLayout(0, 12));
         scanCenter.setOpaque(false);
@@ -263,7 +270,7 @@ public class ScannerFrame extends JFrame {
         JPanel recentPanel = new JPanel(new BorderLayout());
         recentPanel.setBackground(Color.WHITE);
         recentPanel.setBorder(new LineBorder(UITheme.BORDER_COLOR, 1, true));
-        JLabel recentTitle = new JLabel("Live Attendance (auto-refresh every 3 seconds — Green=Present Orange=Late Red=Absent)");
+        JLabel recentTitle = new JLabel("Live Attendance (auto-refresh every 30 seconds — Green=Present Orange=Late Red=Absent)");
         recentTitle.setFont(new Font("Segoe UI", Font.BOLD, 12));
         recentTitle.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
         recentTitle.setOpaque(true);
@@ -277,8 +284,6 @@ public class ScannerFrame extends JFrame {
         content.add(eventStatusRow);
         content.add(Box.createVerticalStrut(16));
         content.add(scanPanel);
-        content.add(Box.createVerticalStrut(16));
-        content.add(searchResultsPanel);
         content.add(Box.createVerticalStrut(16));
         content.add(recentPanel);
 
@@ -328,22 +333,24 @@ public class ScannerFrame extends JFrame {
         try (Connection c = DatabaseConnection.getConnection();
              PreparedStatement ps = c.prepareStatement(
                  "SELECT e.id, e.event_name, e.start_date, e.end_date, e.start_time, e.end_time, e.grace_period, " +
-                 "d.department_name, c.college_name " +
+                 "e.department_id, d.department_name, d.college_id, col.college_name " +
                  "FROM events e " +
                  "JOIN departments d ON e.department_id=d.id " +
-                 "JOIN colleges c ON d.college_id=c.id " +
+                 "JOIN colleges col ON d.college_id=col.id " +
                  "WHERE e.id = ?")) {
             ps.setInt(1, Integer.parseInt(item.split("\\|")[0]));
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     currentEventId = rs.getInt("id");
+                    int eventDeptId   = rs.getInt("department_id");
+                    int eventCollegeId = rs.getInt("college_id");
                     lblEvent.setText(rs.getString("event_name"));
                     lblCollege.setText(rs.getString("college_name"));
                     lblDept.setText(rs.getString("department_name"));
                     lblDates.setText(rs.getString("start_date") + " to " + rs.getString("end_date"));
                     lblTimeRange.setText(rs.getString("start_time") + " - " + rs.getString("end_time") + " | Grace " + rs.getInt("grace_period") + "m");
                     lblScanMessage.setText("Event loaded — scan a student barcode or use the search box.");
-                    loadStudentLookup();
+                    loadStudentLookup(eventDeptId, eventCollegeId);
                 }
             }
         } catch (SQLException e) {
@@ -353,15 +360,42 @@ public class ScannerFrame extends JFrame {
         loadRecentScans();
     }
 
-    private void loadStudentLookup() {
+    private void loadStudentLookup(int deptId, int collegeId) {
         cmbStudentStatus.removeAllItems();
         cmbStudentStatus.addItem("— Pick a Student —");
-        try (Connection c = DatabaseConnection.getConnection();
-             ResultSet rs = c.createStatement().executeQuery(
-                 "SELECT id, student_id_number, first_name, last_name FROM students ORDER BY last_name, first_name")) {
+        try (Connection c = DatabaseConnection.getConnection()) {
+            // Try department-level first
+            PreparedStatement ps = c.prepareStatement(
+                "SELECT id, student_id_number, first_name, last_name " +
+                "FROM students WHERE department_id = ? " +
+                "ORDER BY last_name, first_name");
+            ps.setInt(1, deptId);
+            ResultSet rs = ps.executeQuery();
+            int count = 0;
             while (rs.next()) {
-                cmbStudentStatus.addItem(rs.getInt("id") + "|" + rs.getString("student_id_number") + " - " + rs.getString("first_name") + " " + rs.getString("last_name"));
+                cmbStudentStatus.addItem(rs.getInt("id") + "|" + rs.getString("student_id_number") +
+                    " - " + rs.getString("first_name") + " " + rs.getString("last_name"));
+                count++;
             }
+            rs.close(); ps.close();
+
+            // Fallback: college-level
+            if (count == 0) {
+                PreparedStatement ps2 = c.prepareStatement(
+                    "SELECT id, student_id_number, first_name, last_name " +
+                    "FROM students WHERE college_id = ? " +
+                    "ORDER BY last_name, first_name");
+                ps2.setInt(1, collegeId);
+                ResultSet rs2 = ps2.executeQuery();
+                while (rs2.next()) {
+                    cmbStudentStatus.addItem(rs2.getInt("id") + "|" + rs2.getString("student_id_number") +
+                        " - " + rs2.getString("first_name") + " " + rs2.getString("last_name"));
+                    count++;
+                }
+                rs2.close(); ps2.close();
+            }
+
+            System.out.println("[Scanner] Loaded " + count + " students for dept=" + deptId + " college=" + collegeId);
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -414,7 +448,7 @@ public class ScannerFrame extends JFrame {
     }
 
     private void startRefreshTimer() {
-        refreshTimer = new Timer(3000, e -> loadRecentScans());
+        refreshTimer = new Timer(30000, e -> loadRecentScans());
         refreshTimer.start();
     }
 
@@ -495,6 +529,7 @@ public class ScannerFrame extends JFrame {
 
             txtBarcode.setText("");
             loadRecentScans();
+            notifyAttendanceReport();
         } catch (SQLException e) {
             JOptionPane.showMessageDialog(this, "Error: " + e.getMessage(), "Database Error", JOptionPane.ERROR_MESSAGE);
         }
@@ -521,50 +556,34 @@ public class ScannerFrame extends JFrame {
         }
     }
 
-    private void searchStudents() {
+    private void filterLiveAttendance() {
         String query = txtSearch.getText().trim();
-        if (query.isEmpty()) {
-            clearSearch();
-            return;
-        }
-
-        searchModel.setRowCount(0);
-        String sql = "SELECT s.student_id_number, CONCAT(s.first_name, ' ', s.last_name) AS name, c.college_name, d.department_name, cr.course_name " +
-                     "FROM students s " +
-                     "JOIN colleges c ON s.college_id = c.id " +
-                     "JOIN departments d ON s.department_id = d.id " +
-                     "JOIN courses cr ON s.course_id = cr.id " +
-                     "WHERE s.student_id_number LIKE ? " +
-                     "OR s.first_name LIKE ? " +
-                     "OR s.middle_name LIKE ? " +
-                     "OR s.last_name LIKE ? " +
-                     "OR CONCAT(s.first_name, ' ', s.last_name) LIKE ? " +
-                     "OR CONCAT(s.last_name, ' ', s.first_name) LIKE ? " +
-                     "OR c.college_name LIKE ? " +
-                     "OR d.department_name LIKE ? " +
-                     "OR cr.course_name LIKE ? " +
-                     "ORDER BY s.last_name, s.first_name LIMIT 50";
-        try (Connection c = DatabaseConnection.getConnection();
-             PreparedStatement ps = c.prepareStatement(sql)) {
+        if (query.isEmpty()) { loadRecentScans(); return; }
+        recentModel.setRowCount(0);
+        try {
+            String sql = "SELECT a.id, s.student_id_number, CONCAT(s.first_name, ' ', s.last_name) as name, a.remarks, a.time_in " +
+                         "FROM attendance a JOIN students s ON a.student_id = s.id " +
+                         "WHERE DATE(a.scan_date) = CURDATE() " +
+                         "AND (s.student_id_number LIKE ? OR CONCAT(s.first_name, ' ', s.last_name) LIKE ?) " +
+                         "ORDER BY a.time_in DESC";
+            PreparedStatement ps = DatabaseConnection.getConnection().prepareStatement(sql);
             String term = "%" + query + "%";
-            for (int i = 1; i <= 9; i++) {
-                ps.setString(i, term);
-            }
+            ps.setString(1, term);
+            ps.setString(2, term);
             ResultSet rs = ps.executeQuery();
+            int count = 1;
             while (rs.next()) {
-                searchModel.addRow(new Object[]{
+                recentModel.addRow(new Object[]{
+                    count++,
                     rs.getString("student_id_number"),
                     rs.getString("name"),
-                    rs.getString("college_name"),
-                    rs.getString("department_name"),
-                    rs.getString("course_name")
+                    rs.getString("remarks"),
+                    rs.getTimestamp("time_in")
                 });
             }
-            rs.close();
-            searchResultsPanel.setVisible(true);
+            rs.close(); ps.close();
         } catch (SQLException e) {
             e.printStackTrace();
-            JOptionPane.showMessageDialog(this, "Search failed: " + e.getMessage(), "Database Error", JOptionPane.ERROR_MESSAGE);
         }
     }
 
@@ -572,6 +591,15 @@ public class ScannerFrame extends JFrame {
         txtSearch.setText("");
         searchModel.setRowCount(0);
         searchResultsPanel.setVisible(false);
+    }
+
+    /** Refreshes any open AttendanceReportFrame immediately after a scan. */
+    private void notifyAttendanceReport() {
+        for (java.awt.Window w : java.awt.Window.getWindows()) {
+            if (w instanceof AttendanceReportFrame && w.isShowing()) {
+                ((AttendanceReportFrame) w).refresh();
+            }
+        }
     }
 
     @Override

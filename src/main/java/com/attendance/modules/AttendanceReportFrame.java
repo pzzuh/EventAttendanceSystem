@@ -37,6 +37,18 @@ public class AttendanceReportFrame extends JFrame {
         buildUI();
         loadFilters();
         loadTable();
+
+        // Auto-refresh every 5 seconds to pick up new scans
+        Timer autoRefresh = new Timer(5000, e -> loadTable());
+        autoRefresh.start();
+        addWindowListener(new java.awt.event.WindowAdapter() {
+            public void windowClosed(java.awt.event.WindowEvent we) { autoRefresh.stop(); }
+        });
+    }
+
+    /** Called externally (e.g. from ScannerFrame) to immediately reload data. */
+    public void refresh() {
+        loadTable();
     }
 
     private void buildUI() {
